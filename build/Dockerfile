@@ -18,10 +18,10 @@ ENV CACHE_BUST=1
 
 RUN echo "$(date)" > $BUILD_DATE_FILE
 
-COPY tools /opt/jboss/tools
+COPY build/tools /opt/jboss/tools
 RUN /opt/jboss/tools/build-operator.sh
 
-COPY bin /usr/local/bin
+COPY build/bin /usr/local/bin
 RUN  /usr/local/bin/user_setup
 
 RUN rm -rf /usr/local/go && rm -rf /go && rm -rf /opt/jboss/tools 
