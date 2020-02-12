@@ -96,6 +96,18 @@ spec:
             instances:
               description: Number of Keycloak instances in HA mode. Default is 1.
               type: integer
+            migrations:
+              description: Specify Migrations configuration
+              properties:
+                backups:
+                  description: Set it to config backup policy for migrations
+                  properties:
+                    enabled:
+                      description: If set to ture, the operator will do database backup
+                        before doing migrations
+                      type: boolean
+                  type: object
+              type: object
             podDisruptionBudget:
               description: Specify PodDisruptionBudget configuration
               properties:

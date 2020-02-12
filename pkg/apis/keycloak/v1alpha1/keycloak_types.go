@@ -55,6 +55,9 @@ type KeycloakSpec struct {
 	// Specify images used to override default Keycloak, KeycloakInitContainer, Postgresql and Backup images.
 	// +optional
 	ImageOverrides KeycloakRelatedImages `json:"imageOverrides,omitempty"`
+	// Specify Migrations configuration
+	// +optional
+	Migrations MigrateConfig `json:"migrations,omitempty"`
 }
 
 type KeycloakExternalAccess struct {
@@ -90,6 +93,17 @@ type KeycloakRelatedImages struct {
 	// If set, operator will use it instead of the default Backup image
 	// +optional
 	Backup string `json:"backup,omitempty"`
+}
+
+type MigrateConfig struct {
+	// Set it to config backup policy for migrations
+	// +optional
+	Backups BackupConfig `json:"backups,omitempty"`
+}
+
+type BackupConfig struct {
+	// If set to ture, the operator will do database backup before doing migrations
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 // KeycloakStatus defines the observed state of Keycloak

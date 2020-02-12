@@ -3,6 +3,7 @@ package keycloak
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/keycloak/keycloak-operator/pkg/apis/keycloak/v1alpha1"
 	"github.com/keycloak/keycloak-operator/pkg/common"
@@ -40,6 +41,19 @@ func (i *DefaultMigrator) Migrate(cr *v1alpha1.Keycloak, currentState *common.Cl
 		if deployment != nil {
 			log.Info("Number of replicas decreased to 1")
 			deployment.Spec.Replicas = &[]int32{1}[0]
+		}
+
+		if cr.Spec.Migrations.Backups.Enabled == true {
+			// Should use current Postgresql Image to do the OneTimeLocalBackup
+			if postgresqlNeedsMigration(cr, currentState) {
+				cr.Spec.ImageOverrides.Postgresql = currentState.PostgresqlDeployment.Spec.Template.Spec.Containers[0].Image
+			}
+			desiredState = oneTimeLocalDatabaseBackup(cr, desiredState)
+		}
+	} else if postgresqlNeedsMigration(cr, currentState) {
+		if cr.Spec.Migrations.Backups.Enabled == true {
+			cr.Spec.ImageOverrides.Postgresql = currentState.PostgresqlDeployment.Spec.Template.Spec.Containers[0].Image
+			desiredState = oneTimeLocalDatabaseBackup(cr, desiredState)
 		}
 	}
 
@@ -79,4 +93,40 @@ func findDeployment(desiredState common.DesiredClusterState) *v13.StatefulSet {
 		}
 	}
 	return nil
+}
+
+func postgresqlNeedsMigration(cr *v1alpha1.Keycloak, currentState *common.ClusterState) bool {
+	if currentState.PostgresqlDeployment == nil {
+		return false
+	}
+
+	currentImage := currentState.PostgresqlDeployment.Spec.Template.Spec.Containers[0].Image
+	desiredImage := model.PostgresqlImage
+	if cr.Spec.ImageOverrides.Postgresql != "" {
+		desiredImage = cr.Spec.ImageOverrides.Postgresql
+	}
+
+	return desiredImage != currentImage
+}
+
+// oneTimeLocalDatabaseBackup backups database by OneTimeLocalBackup
+func oneTimeLocalDatabaseBackup(cr *v1alpha1.Keycloak, desiredState common.DesiredClusterState) common.DesiredClusterState {
+	backupCr := &v1alpha1.KeycloakBackup{}
+	backupCr.Namespace = cr.Namespace
+	backupCr.Name = "migration-backup-" + time.Now().Format("20060102-150405")
+
+	backupAction := common.GenericCreateAction{
+		Ref: model.PostgresqlBackup(backupCr, cr),
+		Msg: "Create Local Backup job",
+	}
+	volumeClaimAction := common.GenericCreateAction{
+		Ref: model.PostgresqlBackupPersistentVolumeClaim(backupCr),
+		Msg: "Create Local Backup Persistent Volume Claim",
+	}
+
+	log.Info(fmt.Sprintf("Ready to perform migration OnetimeLocalBackup with name '%s'", backupCr.Name))
+	desiredState = desiredState.AddAction(backupAction)
+	desiredState = desiredState.AddAction(volumeClaimAction)
+
+	return desiredState
 }
